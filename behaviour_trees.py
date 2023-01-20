@@ -1,5 +1,6 @@
 #! /usr/env/bin /python3
 
+from abc import abstractmethod
 from enum import Enum
 from time import sleep
 from datetime import datetime
@@ -10,20 +11,17 @@ class Status(Enum):
   BUSY = "BUSY"
 
 
-class TreeNode:
+class LeafNode:
   status = Status.READY
   outcome = True
 
-  def __init__(self, blackboard):
-    self.blackboard = blackboard
-
+  @abstractmethod
   def __call__(self):
     return self.outcome, self.status
 
 
-class BranchNode(TreeNode):
-  def __init__(self, blackboard, children=[]):
-    super().__init__(blackboard)
+class BranchNode(LeafNode):
+  def __init__(self, children=[]):
     self.children = children
 
   def addChild(self, child):
@@ -33,14 +31,13 @@ class BranchNode(TreeNode):
     self.children += children
 
 
-class LeafNode(TreeNode):
-  pass
-
-
 class Condition(LeafNode):
+  def __init__(self, evaluate=None):
+    self._evaluate = evaluate
+
   def evaluate(self) -> bool:
-    if "evaluateMethod" in self.__dict__:
-      return self.evaluateMethod()
+    if self._evaluate is not None:
+      return self._evaluate()
 
   def __call__(self):
     self.outcome = self.evaluate()
@@ -48,9 +45,12 @@ class Condition(LeafNode):
 
 
 class Action(LeafNode):
+  def __init__(self, execute):
+    self._execute = execute
+
   def execute(self) -> bool:
-    if "executeMethod" in self.__dict__:
-      return self.executeMethod()
+    if self._execute is not None:
+      return self._execute()
 
   def __call__(self, *args, **kwargs):
     if self.status == Status.READY:
@@ -140,34 +140,39 @@ class BehaviourTree:
         continue
       sleep((1/self.rate) - (tock-tick))
 
-  def Action(self, execute):
-    def executeMethod():
-      return execute(self.blackboard)
+  def runOnce(self):
+    for child in child():
+      child()
 
-    action = Action(self.blackboard)
-    action.executeMethod = executeMethod
-    return action
+  def Action(self, func, passBlackboard=True):
+    execute = (
+        lambda: func(self.blackboard)
+        if passBlackboard
+        else func
+    )
+    return Action(execute=execute)
 
-  def Condition(self, evaluate):
-    def evaluateMethod():
-      return evaluate(self.blackboard)
-    condition = Condition(self.blackboard)
-    condition.evaluateMethod = evaluateMethod
-    return condition
+  def Condition(self, func, passBlackboard=True):
+    evaluate = (
+        lambda: func(self.blackboard)
+        if passBlackboard
+        else func
+    )
+    return Condition(evaluate=evaluate)
 
   def Sequence(self, *children):
     if len(children) == 1 and isinstance(children[0], list):
       children = children[0]
     if isinstance(children, tuple):
       children = list(children)
-    return Sequence(self.blackboard, children)
+    return Sequence(children)
 
   def Fallback(self, *children):
     if len(children) == 1 and isinstance(children[0], list):
       children = children[0]
     if isinstance(children, tuple):
       children = list(children)
-    return Fallback(self.blackboard, children)
+    return Fallback(children)
 
   def setTree(self, *children):
     if len(children) == 1 and isinstance(children[0], list):

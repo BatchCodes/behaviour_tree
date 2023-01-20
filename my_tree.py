@@ -39,12 +39,12 @@ bh = BehaviourTree({
     "AT_WALL": False
 })
 ballTree = bh.Fallback(
-    bh.Action(hasBall),
+    bh.Condition(hasBall),
     bh.Action(getBall)
 )
 
 wallTree = bh.Fallback(
-    bh.Action(atWall),
+    bh.Condition(atWall),
     bh.Action(moveToWall)
 )
 
