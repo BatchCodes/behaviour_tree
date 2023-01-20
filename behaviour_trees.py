@@ -1,17 +1,28 @@
 #! /usr/env/bin /python3
 
 from abc import abstractmethod
+from enum import Enum
 from time import sleep
 from datetime import datetime
+
+
+class Status(Enum):
+  READY = "READY"
+  BUSY = "BUSY"
 
 
 class TreeNode:
   def __init__(self, blackboard):
     self.blackboard = blackboard
+    self.status = Status.READY
+    self.outcome = True
 
   @abstractmethod
   def __bool__(self):
     pass
+
+  def __call__(self):
+    return self.outcome, self.status
 
 
 class BranchNode(TreeNode):
@@ -32,37 +43,55 @@ class LeafNode(TreeNode):
 
 class Condition(LeafNode):
   @abstractmethod
-  def __bool__(self):
+  def evaluate(self) -> bool:
     pass
+
+  def __call__(self):
+    self.outcome = self.evaluate()
+    return self.outcome, self.status
 
 
 class Action(LeafNode):
-  status = None
-
   @abstractmethod
-  def __call__(self, *args, **kwargs):
+  def execute(self) -> bool:
     pass
 
-  @abstractmethod
-  def __bool__(self):
-    self()
-    return self.status
+  def __call__(self, *args, **kwargs):
+    if self.status == Status.READY:
+      self.status = Status.BUSY
+      self.outcome = self.execute()
+      self.status = Status.READY
+    return self.outcome, self.status
 
 
 class Sequence(BranchNode):
-  def __bool__(self):
+  def __call__(self):
+    self.outcome = True
     for child in self.children:
-      if not bool(child):
-        return False
-    return True
+      outcome, self.status = child()
+
+      if self.status == Status.BUSY:
+        break
+
+      self.outcome = self.outcome and outcome
+      if not self.outcome:
+        break
+    return self.outcome, self.status
 
 
 class Fallback(BranchNode):
-  def __bool__(self):
+  def __call__(self):
+    self.outcome = False
     for child in self.children:
-      if bool(child):
-        return True
-    return False
+      outcome, self.status = child()
+
+      if self.status == Status.BUSY:
+        break
+
+      self.outcome = self.outcome or outcome
+      if self.outcome:
+        break
+    return self.outcome, self.status
 
 
 class Blackboard():
@@ -91,7 +120,7 @@ class Root(BranchNode):
     while True:
       tick = datetime.timestamp(datetime.now())
       for child in self.children:
-        bool(child)
+        outcome, status = child()
       tock = datetime.timestamp(datetime.now())
       if (tock - tick) > (1/self.rate):
         print("Takes to long for rate")

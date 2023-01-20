@@ -12,42 +12,37 @@ from behaviour_trees import (
 
 
 class HasBall(Condition):
-  def __bool__(self):
-    hasBall = self.blackboard["HAS_BALL"]
-    return hasBall
+  def evaluate(self):
+    return self.blackboard["HAS_BALL"]
 
 
 class GetBall(Action):
-  def __call__(self):
-    self.status = False
+  def execute(self):
     print("Getting Ball")
     self.blackboard["HAS_BALL"] = True
     self.blackboard["AT_WALL"] = False
-    self.status = True
+    return True
 
 
 class AtWall(Condition):
-  def __bool__(self):
-    atWall = self.blackboard["AT_WALL"]
-    return atWall
+  def evaluate(self):
+    return self.blackboard["AT_WALL"]
 
 
 class MoveToWall(Action):
-  def __call__(self):
-    self.status = False
+  def execute(self):
     print("Moving To Wall")
     self.blackboard["AT_WALL"] = True
-    self.status = True
+    return True
 
 
 class Play(Action):
-  def __call__(self):
-    self.status = False
+  def execute(self):
     print("Playing")
     if random() < 0.3:
       print("LOST BALL")
       self.blackboard["HAS_BALL"] = False
-    self.status = True
+      return True
 
 
 blackboard = Blackboard({
