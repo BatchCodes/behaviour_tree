@@ -1,4 +1,4 @@
-#! /usr/env/bin /python3
+#! /usr/bin/env /python3
 
 from abc import abstractmethod
 from enum import Enum
