@@ -1,83 +1,60 @@
 #! /usr/env/bin python3
 
 from random import random
-from behaviour_trees import (
-    Blackboard,
-    Root,
-    Sequence,
-    Fallback,
-    Condition,
-    Action,
-)
+from behaviour_trees import BehaviourTree
 
 
-class HasBall(Condition):
-  def evaluate(self):
-    return self.blackboard["HAS_BALL"]
+def hasBall(blackboard):
+  return blackboard["HAS_BALL"]
 
 
-class GetBall(Action):
-  def execute(self):
-    print("Getting Ball")
-    self.blackboard["HAS_BALL"] = True
-    self.blackboard["AT_WALL"] = False
-    return True
+def getBall(blackboard):
+  print("Getting Ball")
+  blackboard["HAS_BALL"] = True
+  blackboard["AT_WALL"] = False
+  return True
 
 
-class AtWall(Condition):
-  def evaluate(self):
-    return self.blackboard["AT_WALL"]
+def atWall(blackboard):
+  return blackboard["AT_WALL"]
 
 
-class MoveToWall(Action):
-  def execute(self):
-    print("Moving To Wall")
-    self.blackboard["AT_WALL"] = True
-    return True
+def moveToWall(blackboard):
+  print("Moving To Wall")
+  blackboard["AT_WALL"] = True
+  return True
 
 
-class Play(Action):
-  def execute(self):
-    print("Playing")
-    if random() < 0.3:
-      print("LOST BALL")
-      self.blackboard["HAS_BALL"] = False
-      return True
+def play(blackboard):
+  print("Playing")
+  if random() < 0.3:
+    print("LOST BALL")
+    blackboard["HAS_BALL"] = False
+    return False
+  return True
 
 
-blackboard = Blackboard({
+bh = BehaviourTree({
     "HAS_BALL": False,
     "AT_WALL": False
 })
-
-ballTree = Fallback(
-    blackboard,
-    [
-        HasBall(blackboard),
-        GetBall(blackboard)
-    ]
-)
-wallTree = Fallback(
-    blackboard,
-    [
-        AtWall(blackboard),
-        MoveToWall(blackboard)
-    ]
+ballTree = bh.Fallback(
+    bh.Action(hasBall),
+    bh.Action(getBall)
 )
 
-root = Root(
-    rate=1,
-    blackboard=blackboard,
-    children=[
-        Sequence(
-            blackboard=blackboard,
-            children=[
-                ballTree,
-                wallTree,
-                Play(blackboard),
-            ])
-    ]
+wallTree = bh.Fallback(
+    bh.Action(atWall),
+    bh.Action(moveToWall)
+)
+
+bh.setTree(
+    bh.Sequence(
+        ballTree,
+        wallTree,
+        bh.Action(play)
+    )
 )
 
 if __name__ == "__main__":
-  root.run()
+  bh.run()

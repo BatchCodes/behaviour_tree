@@ -1,6 +1,5 @@
 #! /usr/env/bin /python3
 
-from abc import abstractmethod
 from enum import Enum
 from time import sleep
 from datetime import datetime
@@ -12,14 +11,11 @@ class Status(Enum):
 
 
 class TreeNode:
+  status = Status.READY
+  outcome = True
+
   def __init__(self, blackboard):
     self.blackboard = blackboard
-    self.status = Status.READY
-    self.outcome = True
-
-  @abstractmethod
-  def __bool__(self):
-    pass
 
   def __call__(self):
     return self.outcome, self.status
@@ -42,9 +38,9 @@ class LeafNode(TreeNode):
 
 
 class Condition(LeafNode):
-  @abstractmethod
   def evaluate(self) -> bool:
-    pass
+    if "evaluateMethod" in self.__dict__:
+      return self.evaluateMethod()
 
   def __call__(self):
     self.outcome = self.evaluate()
@@ -52,9 +48,9 @@ class Condition(LeafNode):
 
 
 class Action(LeafNode):
-  @abstractmethod
   def execute(self) -> bool:
-    pass
+    if "executeMethod" in self.__dict__:
+      return self.executeMethod()
 
   def __call__(self, *args, **kwargs):
     if self.status == Status.READY:
@@ -125,27 +121,70 @@ class Blackboard():
     return iter(self.innerDict)
 
 
-class Root(BranchNode):
-  def __init__(self, rate, children=[], blackboard=None):
-    self.rate = rate
-    self.children = children
+class BehaviourTree:
+  def __init__(self, blackboard=None, children=[],  rate=1):
     self.blackboard = blackboard or Blackboard()
+    self.children = children
+    self.rate = rate
 
   def run(self):
     while True:
       tick = datetime.timestamp(datetime.now())
       for child in self.children:
-        outcome, status = child()
+        _, status = child()
+        if status == Status.BUSY:
+          break
       tock = datetime.timestamp(datetime.now())
       if (tock - tick) > (1/self.rate):
         print("Takes to long for rate")
         continue
       sleep((1/self.rate) - (tock-tick))
 
-  def __get__(self, key):
-    if key not in self.blackboard:
-      return None
-    return self.blackboard[key]
+  def Action(self, execute):
+    def executeMethod():
+      return execute(self.blackboard)
 
-  def __set__(self, key, value):
-    self.blackboard[key] = value
+    action = Action(self.blackboard)
+    action.executeMethod = executeMethod
+    return action
+
+  def Condition(self, evaluate):
+    def evaluateMethod():
+      return evaluate(self.blackboard)
+    condition = Condition(self.blackboard)
+    condition.evaluateMethod = evaluateMethod
+    return condition
+
+  def Sequence(self, *children):
+    if len(children) == 1 and isinstance(children[0], list):
+      children = children[0]
+    if isinstance(children, tuple):
+      children = list(children)
+    return Sequence(self.blackboard, children)
+
+  def Fallback(self, *children):
+    if len(children) == 1 and isinstance(children[0], list):
+      children = children[0]
+    if isinstance(children, tuple):
+      children = list(children)
+    return Fallback(self.blackboard, children)
+
+  def setTree(self, *children):
+    if len(children) == 1 and isinstance(children[0], list):
+      children = children[0]
+    if isinstance(children, tuple):
+      children = list(children)
+    self.children = children
+
+  def setBlackboard(self, blackboard):
+    if isinstance(blackboard, Blackboard):
+      self.blackboard = blackboard
+      return
+
+    if isinstance(blackboard, dict):
+      self.blackboard = Blackboard(blackboard)
+      return
+
+    raise TypeError(
+        "Blackboard must be of type dict or behaviour_trees.Blackboard"
+    )
