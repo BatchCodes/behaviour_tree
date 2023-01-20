@@ -96,15 +96,30 @@ class Fallback(BranchNode):
 
 class Blackboard():
   def __init__(self, innerDict=None):
-    self.innerDict = innerDict or None
+    self.innerDict = innerDict or dict()
+    self.locked = False
+
+  def __enter__(self):
+    self.locked = True
+
+  def __exit__(self, exceptionType, value, traceback):
+    self.locked = False
 
   def __getitem__(self, key):
-    if key not in self.innerDict:
-      return None
-    return self.innerDict[key]
+    while self.locked:
+      sleep(0.1)
+
+    with self:
+      if key not in self.innerDict:
+        return None
+      return self.innerDict[key]
 
   def __setitem__(self, key, value):
-    self.innerDict[key] = value
+    while self.locked:
+      sleep(0.1)
+
+    with self:
+      self.innerDict[key] = value
 
   def __iter__(self):
     return iter(self.innerDict)
